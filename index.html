@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=0.8, user-scalable=no">
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+            font-family: Arial, sans-serif;
+        }
+
+        .minesweeper-container {
+            display: grid;
+            grid-template-columns: repeat(7, 60px);
+            grid-template-rows: repeat(6, 60px);
+            gap: 2px;
+        }
+
+        .cell {
+            width: 60px;
+            height: 60px;
+            background-color: #ccc;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 24px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .cell.hidden {
+            background-color: #787C7F;
+        }
+
+        .cell.clicked {
+            background-color: #787C7F;
+            color: white;
+        }
+
+        .cell.green {
+            background-color: #78CF6F;
+        }
+
+        .cell.green.clicked {
+            background-color: #78CF6F;
+            color: white;
+        }
+
+        .cell.yellow {
+            background-color: #FAD04F;
+            color: white;
+        }
+
+        .message {
+            margin-top: 20px;
+            font-size: 18px;
+            font-weight: bold;
+            color: white;
+        }
+
+        .buttons {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+        }
+
+        .button {
+            padding: 8px 16px;
+            background-color: #5eca53;
+            color: #fff;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            border-radius: 5px;
+        }
+
+        .button:hover {
+            background-color: #439f3a;
+        }
+
+        .level-info {
+            margin-top: 10px;
+            font-size: 16px;
+            font-weight: bold;
+        }
+
+        .chances {
+            font-size: 18px;
+            font-weight: bold;
+            color: black;
+        }
+
+	hr {
+
+	top: 2px;
+	
+}
+
+
+.instruction-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    margin-bottom: 20px;
+}
+
+.instruction-content {
+    display: none;
+    width: 300px;
+    padding: 10px;
+    background-color: #fff;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    box-shadow: 0px 2px 6px rgba(0, 0, 0, 0.2);
+    position: absolute;
+    top: 40px;
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+.instruction-content p {
+    margin: 8px 0;
+}
+
+.instruction-content ul {
+    list-style: none;
+    padding-left: 20px;
+}
+
+.instruction-content li {
+    margin: 6px 0;
+}
+
+.instruction-show .instruction-content {
+    display: block;
+}
+
+.cell-color {
+    width: 20px;
+    height: 20px;
+    display: inline-block;
+    margin-right: 8px;
+    border-radius: 50%;
+}
+
+.cell-green {
+    background-color: #78CF6F;
+}
+
+.cell-yellow {
+    background-color: #FAD04F;
+}
+
+.cell-grey {
+    background-color: #ccc;
+}
+
+
+
+
+    </style>
+    <title>Colors</title>
+</head>
+<body>
+
+<header>
+    <center><h1><img src="title.png"></h1></center>
+</header>
+<div class="instruction-container" id="instructionContainer">
+    <button class="button" id="instructionButton">Instructions</button>
+    <div class="instruction-content" id="instructionContent">
+        <center><p>Welcome to Griddle! Try to guess the hidden green tile.</p></center>
+        <center><p>Clicking a cell reveals its color:</p></center>
+        <ul>
+            <li><span class="cell-color cell-green"></span> Green: Correct cell</li>
+            <li><span class="cell-color cell-yellow"></span> Yellow: Correct cell is close</li>
+            <li><span class="cell-color cell-grey"></span> Grey: Hint cell</li>
+        </ul>
+        <center><p>You get 15 chances per game. Good luck!</p></center>
+        <center><button class="button" id="closeInstruction">Got It!</button></center>
+    </div>
+</div>
+<div>
+    <div class="level-info" id="levelInfo"></div>
+    <div class="chances" id="chancesInfo"></div>
+    <br>
+    <div class="minesweeper-container" id="minesweeper-container">
+    </div>
+</div>
+<div class="message" id="message" style="display: none;"></div>
+<div class="buttons" id="buttons" style="display: none;">
+    <button class="button" id="shareButton">Share</button>
+    <button class="button" id="nextButton">Retry</button>
+    <input type="text" id="clipboardInput" style="position: absolute; left: -9999px;">
+</div>
+
+<script>
+
+const instructionButton = document.getElementById('instructionButton');
+const instructionContainer = document.getElementById('instructionContainer');
+const instructionContent = document.getElementById('instructionContent');
+const closeInstruction = document.getElementById('closeInstruction');
+
+instructionButton.addEventListener('click', () => {
+    instructionContainer.classList.add('instruction-show');
+});
+
+closeInstruction.addEventListener('click', () => {
+    instructionContainer.classList.remove('instruction-show');
+});
+
+    const container = document.getElementById('minesweeper-container');
+    const messageElement = document.getElementById('message');
+    const buttonsElement = document.getElementById('buttons');
+    const shareButton = document.getElementById('shareButton');
+    const nextButton = document.getElementById('nextButton');
+    const levelInfo = document.getElementById('levelInfo');
+    const chancesInfo = document.getElementById('chancesInfo');
+
+    let greyTilesClicked = 0;
+    let yellowTilesClicked = 0;
+    let greenTilesClicked = 0;
+
+    let isGameOver = false;
+    let tilesClicked = 0;
+    let clickedTiles = {};
+    let greenTileClicked = false;
+    let remainingChances = 15;
+
+    let currentLevel = 1;
+    let previousDate = new Date().getDate();
+    const gridSize = 7;
+    let greenTileRow = Math.floor(Math.random() * gridSize);
+    let greenTileCol = Math.floor(Math.random() * gridSize);
+
+    function updateLevelInfo() {
+        const currentDate = new Date();
+        const day = currentDate.getDate();
+        const month = currentDate.toLocaleString('default', { month: 'short' });
+
+        levelInfo.textContent = `Day ${currentLevel} | ${day} ${month}`;
+        chancesInfo.textContent = `Chances Remaining: ${remainingChances}`;
+    }
+
+    function calculateDistance(row, col) {
+        return Math.max(Math.abs(row - greenTileRow), Math.abs(col - greenTileCol));
+    }
+
+    nextButton.addEventListener('click', () => {
+        restartGame();
+        updateLevelInfo();
+    });
+
+    function createCell(row, col) {
+        const cell = document.createElement('div');
+        cell.className = 'cell';
+        cell.dataset.row = row;
+        cell.dataset.col = col;
+        cell.addEventListener('click', handleClick);
+        container.appendChild(cell);
+    }
+
+    function handleClick(event) {
+        if (isGameOver) return;
+
+        const cell = event.target;
+        const row = parseInt(cell.dataset.row);
+        const col = parseInt(cell.dataset.col);
+
+        if (clickedTiles[`${row}-${col}`]) {
+            return;
+        }
+
+        clickedTiles[`${row}-${col}`] = true;
+
+        if (tilesClicked === 0) {
+            startTime = new Date();
+        }
+
+        if (row === greenTileRow && col === greenTileCol) {
+            cell.classList.add('green', 'clicked');
+            const endTime = new Date();
+            const timeDifference = (endTime - startTime) / 1000;
+            gameOver(timeDifference);
+	      greenTilesClicked += 1;
+        } else if (Math.abs(row - greenTileRow) <= 1 && Math.abs(col - greenTileCol) <= 1) {
+            cell.classList.add('yellow');
+            yellowTilesClicked++;
+        } else {
+            const distance = calculateDistance(row, col);
+            cell.classList.add('clicked');
+            cell.textContent = distance;
+            greyTilesClicked++;
+            remainingChances--;
+            chancesInfo.textContent = `Chances Remaining: ${remainingChances}`;
+
+            if (remainingChances === 0) {
+                gameOverTo();
+            }
+        }
+
+        tilesClicked++;
+    }
+
+    function gameOver(time) {
+        isGameOver = true;
+        messageElement.textContent = `Congrats! You got it in ${tilesClicked} clicks.`;
+        messageElement.style.color = 'black';
+        messageElement.style.display = 'block';
+        buttonsElement.style.display = 'flex';
+    }
+
+
+  function gameOverTo() {
+        isGameOver = true;
+        messageElement.textContent = `You ran out of chances!`;
+        messageElement.style.color = 'black';
+        messageElement.style.display = 'block';
+        buttonsElement.style.display = 'flex';
+    }
+
+
+
+
+    function createBoard() {
+        for (let row = 0; row < gridSize; row++) {
+            for (let col = 0; col < gridSize; col++) {
+                createCell(row, col);
+            }
+        }
+    }
+
+    function restartGame() {
+        container.innerHTML = '';
+        messageElement.style.display = 'none';
+        buttonsElement.style.display = 'none';
+        isGameOver = false;
+        tilesClicked = 0;
+	  greenTilesClicked = 0;
+	  greyTilesClicked = 0;
+	  yellowTilesClicked = 0;
+        clickedTiles = {};
+        greenTileRow = Math.floor(Math.random() * gridSize);
+        greenTileCol = Math.floor(Math.random() * gridSize);
+        remainingChances = 15; // Reset chances
+        createBoard();
+    }
+
+    function shareGridAsPNG() {
+        html2canvas(container, { useCORS: true }).then(canvas => {
+            const currentDate = new Date();
+            const day = currentDate.getDate();
+            const month = currentDate.getMonth() + 1;
+            const filename = `Griddle_Day_${currentLevel}.png`;
+
+            
+          const shareText = `Grey: ${greyTilesClicked} 🟦 | Yellow: ${yellowTilesClicked} 🟨 | Green: ${greenTilesClicked} 🟩`
+
+           
+            const clipboardInput = document.getElementById('clipboardInput');
+            clipboardInput.value = shareText;
+
+
+            clipboardInput.select();
+            document.execCommand('copy');
+
+            const link = document.createElement('a');
+            link.href = canvas.toDataURL('image/png');
+            link.download = filename;
+
+            link.click();
+        });
+    }
+
+    createBoard();
+
+    shareButton.addEventListener('click', shareGridAsPNG);
+    updateLevelInfo();
+</script>
+<script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+</body>
+</html>
